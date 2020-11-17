@@ -49,10 +49,15 @@ Tensor clamp(
           v_output.extents(),
           // Write-only access bypasses synchronization but inserts appropriate
           // barriers if necessary.
-          v_output.image(command_buffer, vTensor::Access::Write),
+          v_output.image(
+              command_buffer,
+              vTensor::Stage::Compute,
+              vTensor::Access::Write),
           // Read-only access is implied on const tensors and triggers an async
           // synchronization if necessary.
-          v_self.image(command_buffer),
+          v_self.image(
+              command_buffer,
+              vTensor::Stage::Compute),
           // Object lifetime is managed by the resource pool.
           // It is OK not to keep track of the handle.
           context->resource().pool.uniform(block).object);
@@ -68,7 +73,7 @@ Tensor clamp(
 }
 
 Tensor& clamp_(
-    Tensor& self_arg,
+    Tensor& self,
     const c10::optional<Scalar> min_value,
     const c10::optional<Scalar> max_value) {
   api::Context* const context = api::context();
@@ -78,10 +83,10 @@ Tensor& clamp_(
       "At least one of 'min' or 'max' must not be None");
 
   TORCH_CHECK(
-      self_arg.is_vulkan(),
+      self.is_vulkan(),
       "Vulkan: In-place clamp is only supported on Vulkan tensors.");
 
-  vTensor& v_self = convert(self_arg);
+  vTensor& v_self = convert(self);
 
   api::Command::Buffer command_buffer = context->command().pool.allocate();
   command_buffer.begin();
@@ -105,7 +110,10 @@ Tensor& clamp_(
           v_self.extents(),
           // Read-Write access triggers an async synchronization if necessory
           // and inserts appropriate barriers if hazards are detected.
-          v_self.image(command_buffer, vTensor::Access::Read | vTensor::Access::Write),
+          v_self.image(
+              command_buffer,
+              vTensor::Stage::Compute,
+              vTensor::Access::Read | vTensor::Access::Write),
           // Object lifetime is managed by the resource pool.
           // It is OK not to keep track of the handle.
           context->resource().pool.uniform(block).object);
@@ -117,7 +125,7 @@ Tensor& clamp_(
   command_buffer.end();
   command_buffer.submit(context->gpu().queue);
 
-  return self_arg;
+  return self;
 }
 
 Tensor hardtanh(
